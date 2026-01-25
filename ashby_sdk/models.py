@@ -299,6 +299,74 @@ class ApplicationFormSubmission:
 
 
 @dataclass
+class JobPosting:
+    """Represents a job posting with description and details."""
+
+    id: str
+    title: str
+    job_id: str
+    location_ids: list[str] = field(default_factory=list)
+    is_listed: bool = True
+    is_live: bool = True
+    employment_type: Optional[str] = None
+    description_plain: Optional[str] = None
+    description_html: Optional[str] = None
+    published_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "JobPosting":
+        return cls(
+            id=data.get("id", ""),
+            title=data.get("title", ""),
+            job_id=data.get("jobId", ""),
+            location_ids=data.get("locationIds", []),
+            is_listed=data.get("isListed", True),
+            is_live=data.get("isLive", True),
+            employment_type=data.get("employmentType"),
+            description_plain=data.get("descriptionPlain"),
+            description_html=data.get("descriptionHtml"),
+            published_at=data.get("publishedAt"),
+            updated_at=data.get("updatedAt"),
+            raw_data=data,
+        )
+
+    @property
+    def description(self) -> Optional[str]:
+        """Get the job description, preferring plain text."""
+        if self.description_plain:
+            return self.description_plain
+        if self.description_html:
+            import re
+            return re.sub('<[^<]+?>', ' ', self.description_html)
+        return None
+
+
+@dataclass
+class Note:
+    """Represents a candidate note."""
+
+    id: str
+    content: str
+    content_type: str = "text/plain"
+    created_at: Optional[str] = None
+    author: Optional[User] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Note":
+        return cls(
+            id=data.get("id", ""),
+            content=data.get("content", ""),
+            content_type=data.get("type", "text/plain"),
+            created_at=data.get("createdAt"),
+            author=User.from_dict(data["author"]) if data.get("author") else None,
+            raw_data=data,
+        )
+
+
+@dataclass
 class Job:
     """Represents a job posting."""
 
@@ -309,6 +377,7 @@ class Job:
     employment_type: Optional[str] = None
     department_id: Optional[str] = None
     location_id: Optional[str] = None
+    job_posting_ids: list[str] = field(default_factory=list)
     hiring_team: list[HiringTeamMember] = field(default_factory=list)
     custom_fields: list[CustomField] = field(default_factory=list)
     created_at: Optional[str] = None
@@ -327,6 +396,7 @@ class Job:
             employment_type=data.get("employmentType"),
             department_id=data.get("departmentId"),
             location_id=data.get("locationId"),
+            job_posting_ids=data.get("jobPostingIds", []),
             hiring_team=[
                 HiringTeamMember.from_dict(m) for m in data.get("hiringTeam", [])
             ],

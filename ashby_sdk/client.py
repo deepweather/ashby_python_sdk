@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .exceptions import AshbyAPIError, AshbyAuthError, AshbyNotFoundError
-from .models import Job, Application, Candidate, File
+from .models import Job, Application, Candidate, File, JobPosting, Note
 
 T = TypeVar("T")
 
@@ -322,6 +322,129 @@ class FilesResource(BaseResource):
         return response.content, filename
 
 
+class JobPostingsResource(BaseResource):
+    """API resource for job postings (with descriptions)."""
+
+    def list(
+        self,
+        job_id: Optional[str] = None,
+        limit: int = 100,
+    ) -> list[JobPosting]:
+        """
+        List all job postings.
+
+        Args:
+            job_id: Filter by job ID (optional)
+            limit: Results per page (default 100)
+
+        Returns:
+            List of JobPosting objects
+        """
+        data = {}
+        if job_id:
+            data["jobId"] = job_id
+        return [
+            JobPosting.from_dict(p) for p in self._paginate("jobPosting.list", data, limit)
+        ]
+
+    def get(self, posting_id: str) -> JobPosting:
+        """
+        Get a job posting by ID.
+
+        Args:
+            posting_id: The job posting ID
+
+        Returns:
+            JobPosting object with description
+        """
+        response = self._request("jobPosting.info", {"jobPostingId": posting_id})
+        return JobPosting.from_dict(response.get("results", {}))
+
+    def get_for_job(self, job_id: str) -> Optional[JobPosting]:
+        """
+        Get the primary job posting for a job.
+
+        Args:
+            job_id: The job ID
+
+        Returns:
+            JobPosting object or None if no postings exist
+        """
+        postings = self.list(job_id=job_id)
+        return postings[0] if postings else None
+
+    def get_description(self, job_id: str) -> Optional[str]:
+        """
+        Get the job description for a job.
+        
+        Convenience method that fetches the job posting and returns
+        the plain text description.
+
+        Args:
+            job_id: The job ID
+
+        Returns:
+            Plain text job description or None
+        """
+        posting = self.get_for_job(job_id)
+        return posting.description if posting else None
+
+
+class NotesResource(BaseResource):
+    """API resource for candidate notes."""
+
+    def create(
+        self,
+        candidate_id: str,
+        note_text: str,
+        note_type: str = "text/plain",
+    ) -> Note:
+        """
+        Create a note on a candidate.
+
+        Args:
+            candidate_id: The candidate ID
+            note_text: The note content
+            note_type: "text/plain" or "text/html" (default "text/plain")
+
+        Returns:
+            Note object with the created note
+        """
+        response = self._request(
+            "candidate.createNote",
+            {
+                "candidateId": candidate_id,
+                "note": note_text,
+                "type": note_type,
+            }
+        )
+        return Note.from_dict(response.get("results", {}))
+
+    def list(
+        self,
+        candidate_id: str,
+        limit: int = 100,
+    ) -> list[Note]:
+        """
+        List all notes for a candidate.
+
+        Args:
+            candidate_id: The candidate ID
+            limit: Results per page (default 100)
+
+        Returns:
+            List of Note objects
+        """
+        return [
+            Note.from_dict(n)
+            for n in self._paginate(
+                "candidate.listNotes",
+                {"candidateId": candidate_id},
+                limit
+            )
+        ]
+
+
 class AshbyClient:
     """
     Client for interacting with the Ashby API.
@@ -368,6 +491,8 @@ class AshbyClient:
         self.candidates = CandidatesResource(self)
         self.surveys = SurveysResource(self)
         self.files = FilesResource(self)
+        self.job_postings = JobPostingsResource(self)
+        self.notes = NotesResource(self)
 
     def _request(self, endpoint: str, data: Optional[dict] = None) -> dict:
         """
@@ -468,3 +593,39 @@ class AshbyClient:
         if not candidate.resume_handle:
             return None
         return self.files.download(candidate.resume_handle)
+
+    def get_job_description(self, job_id: str) -> Optional[str]:
+        """
+        Get the job description for a job.
+        
+        Convenience method that fetches the job posting and returns
+        the plain text description.
+
+        Args:
+            job_id: The job ID
+
+        Returns:
+            Plain text job description or None if not found
+        """
+        return self.job_postings.get_description(job_id)
+
+    def create_candidate_note(
+        self,
+        candidate_id: str,
+        note_text: str,
+        note_type: str = "text/plain",
+    ) -> Note:
+        """
+        Create a note on a candidate.
+
+        Convenience method for notes.create().
+
+        Args:
+            candidate_id: The candidate ID
+            note_text: The note content
+            note_type: "text/plain" or "text/html"
+
+        Returns:
+            Note object with the created note
+        """
+        return self.notes.create(candidate_id, note_text, note_type)

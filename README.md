@@ -71,8 +71,9 @@ Your API key needs these permissions:
 
 | Module | Permission | Endpoints |
 |--------|------------|-----------|
-| Jobs | Read | `job.list`, `job.info` |
+| Jobs | Read | `job.list`, `job.info`, `jobPosting.list`, `jobPosting.info` |
 | Candidates | Read | `application.list`, `application.info`, `candidate.info`, `file.info`, `surveySubmission.list` |
+| Candidates | Write | `candidate.createNote` (for notes) |
 
 ## Resources
 
@@ -164,6 +165,49 @@ if candidate.resume_handle:
     content, filename = client.files.download(candidate.resume_handle)
 ```
 
+### Job Postings (Descriptions)
+
+```python
+# Get job posting details (includes description)
+posting = client.job_postings.get(posting_id="...")
+print(posting.title)
+print(posting.description_plain)
+print(posting.description)  # Prefers plain text, falls back to stripped HTML
+
+# Get posting for a job
+posting = client.job_postings.get_for_job(job_id="...")
+
+# Get job description directly (convenience method)
+description = client.get_job_description(job_id="...")
+print(description)
+
+# List all postings for a job
+postings = client.job_postings.list(job_id="...")
+```
+
+### Notes
+
+```python
+# Create a note on a candidate
+note = client.notes.create(
+    candidate_id="...",
+    note_text="Great candidate, recommend for interview.",
+    note_type="text/plain"  # or "text/html"
+)
+print(note.id)
+
+# Or use convenience method
+note = client.create_candidate_note(
+    candidate_id="...",
+    note_text="Interview scheduled."
+)
+
+# List notes for a candidate
+notes = client.notes.list(candidate_id="...")
+for note in notes:
+    print(f"{note.created_at}: {note.content}")
+```
+
 ## Data Models
 
 All responses are wrapped in typed dataclasses:
@@ -171,8 +215,10 @@ All responses are wrapped in typed dataclasses:
 | Model | Description |
 |-------|-------------|
 | `Job` | Job posting with title, status, hiring team |
+| `JobPosting` | Job posting details with description |
 | `Application` | Job application with status, stage, forms |
 | `Candidate` | Candidate with contact info, resume, links |
+| `Note` | Candidate note with content and author |
 | `File` | File with download handle |
 | `InterviewStage` | Pipeline stage |
 | `Source` | Application source |
@@ -239,10 +285,14 @@ uv run mypy .
 |------------|----------------|
 | `client.jobs.list()` | `POST /job.list` |
 | `client.jobs.get()` | `POST /job.info` |
+| `client.job_postings.list()` | `POST /jobPosting.list` |
+| `client.job_postings.get()` | `POST /jobPosting.info` |
 | `client.applications.list()` | `POST /application.list` |
 | `client.applications.get()` | `POST /application.info` |
 | `client.candidates.list()` | `POST /candidate.list` |
 | `client.candidates.get()` | `POST /candidate.info` |
+| `client.notes.create()` | `POST /candidate.createNote` |
+| `client.notes.list()` | `POST /candidate.listNotes` |
 | `client.surveys.list()` | `POST /surveySubmission.list` |
 | `client.files.get_url()` | `POST /file.info` |
 

@@ -16,6 +16,8 @@ Resources:
     - client.candidates - Candidate profiles
     - client.surveys - Questionnaire/form submissions
     - client.files - File downloads (resumes, etc.)
+    - client.job_postings - Job posting details with descriptions
+    - client.notes - Candidate notes
 
 For full documentation, see: https://github.com/deepweather/ashby_python_sdk
 """
@@ -23,9 +25,11 @@ For full documentation, see: https://github.com/deepweather/ashby_python_sdk
 from .client import AshbyClient
 from .models import (
     Job,
+    JobPosting,
     Application,
     Candidate,
     File,
+    Note,
     ApplicationFormSubmission,
     InterviewStage,
     Source,
@@ -45,16 +49,18 @@ from .exceptions import (
     AshbyRateLimitError,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Main client
     "AshbyClient",
     # Models
     "Job",
+    "JobPosting",
     "Application",
     "Candidate",
     "File",
+    "Note",
     "ApplicationFormSubmission",
     "InterviewStage",
     "Source",
