@@ -362,16 +362,22 @@ class JobPostingsResource(BaseResource):
 
     def get_for_job(self, job_id: str) -> Optional[JobPosting]:
         """
-        Get the primary job posting for a job.
+        Get the primary job posting for a job with full details.
+
+        This method first lists postings for the job, then fetches the 
+        full details (including description) for the first posting.
 
         Args:
             job_id: The job ID
 
         Returns:
-            JobPosting object or None if no postings exist
+            JobPosting object with description, or None if no postings exist
         """
         postings = self.list(job_id=job_id)
-        return postings[0] if postings else None
+        if not postings:
+            return None
+        # Fetch full details including description
+        return self.get(postings[0].id)
 
     def get_description(self, job_id: str) -> Optional[str]:
         """
