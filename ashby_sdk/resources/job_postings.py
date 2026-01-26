@@ -25,13 +25,19 @@ class JobPostingsResource(BaseResource):
 
         Returns:
             List of JobPosting objects
+        
+        Note:
+            The Ashby API does not filter by jobId server-side, so we filter
+            client-side if job_id is provided.
         """
-        data = {}
-        if job_id:
-            data["jobId"] = job_id
-        return [
-            JobPosting.from_dict(p) for p in self._paginate("jobPosting.list", data, limit)
+        # Note: Ashby API ignores jobId filter, so we fetch all and filter client-side
+        all_postings = [
+            JobPosting.from_dict(p) for p in self._paginate("jobPosting.list", {}, limit)
         ]
+        
+        if job_id:
+            return [p for p in all_postings if p.job_id == job_id]
+        return all_postings
 
     def get(self, posting_id: str) -> JobPosting:
         """
