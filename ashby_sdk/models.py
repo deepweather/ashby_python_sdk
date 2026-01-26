@@ -379,6 +379,250 @@ class Note:
         )
 
 
+# ---------------------------------------------------------------------------
+# New models for generic resources
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ArchiveReason:
+    """Represents an archive/rejection reason for candidates."""
+
+    id: str
+    name: str
+    reason_type: Optional[str] = None
+    is_archived: bool = False
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "ArchiveReason":
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("text", "") or data.get("name", ""),
+            reason_type=data.get("reasonType"),
+            is_archived=data.get("isArchived", False),
+            raw_data=data,
+        )
+
+
+@dataclass
+class CloseReason:
+    """Represents a reason for closing a job."""
+
+    id: str
+    name: str
+    is_archived: bool = False
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CloseReason":
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("text", "") or data.get("name", ""),
+            is_archived=data.get("isArchived", False),
+            raw_data=data,
+        )
+
+
+@dataclass
+class Project:
+    """Represents a talent pool/project."""
+
+    id: str
+    name: str
+    is_archived: bool = False
+    is_confidential: bool = False
+    created_at: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Project":
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("name", "") or data.get("title", ""),
+            is_archived=data.get("isArchived", False),
+            is_confidential=data.get("isConfidential", False),
+            created_at=data.get("createdAt"),
+            raw_data=data,
+        )
+
+
+@dataclass
+class Offer:
+    """Represents a job offer."""
+
+    id: str
+    application_id: str
+    status: str
+    start_date: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Offer":
+        return cls(
+            id=data.get("id", ""),
+            application_id=data.get("applicationId", ""),
+            status=data.get("status", ""),
+            start_date=data.get("startDate"),
+            created_at=data.get("createdAt"),
+            updated_at=data.get("updatedAt"),
+            raw_data=data,
+        )
+
+
+@dataclass
+class Interview:
+    """Represents a scheduled interview."""
+
+    id: str
+    application_id: Optional[str] = None
+    status: Optional[str] = None
+    interview_stage_id: Optional[str] = None
+    scheduled_start_time: Optional[str] = None
+    scheduled_end_time: Optional[str] = None
+    created_at: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Interview":
+        return cls(
+            id=data.get("id", ""),
+            application_id=data.get("applicationId"),
+            status=data.get("status"),
+            interview_stage_id=data.get("interviewStageId"),
+            scheduled_start_time=data.get("scheduledStartTime"),
+            scheduled_end_time=data.get("scheduledEndTime"),
+            created_at=data.get("createdAt"),
+            raw_data=data,
+        )
+
+
+@dataclass
+class InterviewSchedule:
+    """Represents an interview schedule."""
+
+    id: str
+    application_id: Optional[str] = None
+    status: Optional[str] = None
+    scheduled_start_time: Optional[str] = None
+    scheduled_end_time: Optional[str] = None
+    created_at: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "InterviewSchedule":
+        return cls(
+            id=data.get("id", ""),
+            application_id=data.get("applicationId"),
+            status=data.get("status"),
+            scheduled_start_time=data.get("scheduledStartTime"),
+            scheduled_end_time=data.get("scheduledEndTime"),
+            created_at=data.get("createdAt"),
+            raw_data=data,
+        )
+
+
+@dataclass
+class HiringTeamRole:
+    """Represents a hiring team role type.
+    
+    Note: The hiringTeamRole.list endpoint returns just role names as strings,
+    not full objects. This model handles both cases.
+    """
+
+    name: str
+    id: str = ""
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data) -> "HiringTeamRole":
+        # Handle case where data is just a string (from hiringTeamRole.list)
+        if isinstance(data, str):
+            return cls(name=data, id="", raw_data={})
+        # Handle case where data is a dict (from other endpoints)
+        return cls(
+            id=data.get("id", ""),
+            name=data.get("name", "") or data.get("title", ""),
+            raw_data=data,
+        )
+
+
+@dataclass
+class CustomFieldDefinition:
+    """Represents a custom field definition (not a value)."""
+
+    id: str
+    title: str
+    field_type: str
+    object_type: Optional[str] = None
+    is_required: bool = False
+    is_archived: bool = False
+    selectable_values: list[dict] = field(default_factory=list)
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "CustomFieldDefinition":
+        return cls(
+            id=data.get("id", ""),
+            title=data.get("title", ""),
+            field_type=data.get("fieldType", ""),
+            object_type=data.get("objectType"),
+            is_required=data.get("isRequired", False),
+            is_archived=data.get("isArchived", False),
+            selectable_values=data.get("selectableValues", []),
+            raw_data=data,
+        )
+
+
+@dataclass
+class Feedback:
+    """Represents interview feedback / scorecard."""
+
+    id: str
+    application_id: str
+    interview_id: Optional[str] = None
+    submitted_at: Optional[str] = None
+    submitter: Optional[User] = None
+    form_definition: Optional[dict] = None
+    submitted_values: list[dict] = field(default_factory=list)
+    overall_recommendation: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Feedback":
+        # Try to extract overall recommendation from submitted values
+        overall_rec = None
+        submitted_values = data.get("submittedValues", [])
+        for val in submitted_values:
+            field_info = val.get("field", {})
+            if field_info.get("title", "").lower() in ("overall recommendation", "recommendation"):
+                overall_rec = val.get("value")
+                break
+        
+        return cls(
+            id=data.get("id", ""),
+            application_id=data.get("applicationId", ""),
+            interview_id=data.get("interviewId"),
+            submitted_at=data.get("submittedAt"),
+            submitter=User.from_dict(data["submitter"]) if data.get("submitter") else None,
+            form_definition=data.get("formDefinition"),
+            submitted_values=submitted_values,
+            overall_recommendation=overall_rec,
+            raw_data=data,
+        )
+
+    def get_score(self, field_title: str) -> Any:
+        """Get a score/value by field title (case-insensitive)."""
+        title_lower = field_title.lower()
+        for val in self.submitted_values:
+            field_info = val.get("field", {})
+            if field_info.get("title", "").lower() == title_lower:
+                return val.get("value")
+        return None
+
+
 @dataclass
 class Job:
     """Represents a job posting."""

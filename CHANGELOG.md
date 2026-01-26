@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-26
+
+### Added
+
+- Generic resource system for easy addition of new endpoints
+- New resources via generic pattern:
+  - `client.sources` - List candidate sources
+  - `client.archive_reasons` - List archive/rejection reasons
+  - `client.close_reasons` - List job close reasons
+  - `client.departments` - List/get departments
+  - `client.locations` - List/get locations
+  - `client.users` - List/get team members
+  - `client.candidate_tags` - List candidate tags
+  - `client.custom_fields` - List/get custom field definitions
+  - `client.projects` - List/get talent pools
+  - `client.offers` - List/get offers
+  - `client.interviews` - List/get interviews
+  - `client.interview_schedules` - List/get interview schedules
+  - `client.hiring_team_roles` - List hiring team roles
+- `client.feedback` resource for interview scorecards
+  - `list_for_application(application_id)` - Get feedback for an application
+- New candidate methods:
+  - `client.candidates.search(email, name)` - Search candidates
+  - `client.candidates.add_tag(candidate_id, tag_id)` - Add tag to candidate
+- New models: `ArchiveReason`, `CloseReason`, `Project`, `Offer`, `Interview`, `InterviewSchedule`, `HiringTeamRole`, `CustomFieldDefinition`, `Feedback`
+- Mock tests using `responses` library
+- Integration tests with real API (skipped if no API key)
+- Test markers: `@pytest.mark.integration`, `@pytest.mark.writes`
+
+### Changed
+
+- `HiringTeamRole` model now handles both string and dict responses from API
+
 ## [0.3.0] - 2025-01-24
 
 ### Added
@@ -59,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Full type hints with `py.typed` marker
 - Automatic `.env` file loading for API key
 
-[Unreleased]: https://github.com/deepweather/ashby_python_sdk/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/deepweather/ashby_python_sdk/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/deepweather/ashby_python_sdk/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/deepweather/ashby_python_sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/deepweather/ashby_python_sdk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/deepweather/ashby_python_sdk/releases/tag/v0.1.0

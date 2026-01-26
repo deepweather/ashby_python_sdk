@@ -13,12 +13,26 @@ Basic Usage:
 Resources:
     - client.jobs - Job postings
     - client.applications - Job applications (with change_stage support)
-    - client.candidates - Candidate profiles
+    - client.candidates - Candidate profiles (with search and add_tag)
     - client.interview_stages - Interview stages/hiring funnel
     - client.surveys - Questionnaire/form submissions
     - client.files - File downloads (resumes, etc.)
     - client.job_postings - Job posting details with descriptions
     - client.notes - Candidate notes
+    - client.feedback - Interview feedback/scorecards
+    - client.sources - Candidate sources
+    - client.archive_reasons - Archive/rejection reasons
+    - client.close_reasons - Job close reasons
+    - client.departments - Organization departments
+    - client.locations - Office locations
+    - client.users - Team members
+    - client.candidate_tags - Candidate tags
+    - client.custom_fields - Custom field definitions
+    - client.projects - Talent pools
+    - client.offers - Job offers
+    - client.interviews - Scheduled interviews
+    - client.interview_schedules - Interview schedules
+    - client.hiring_team_roles - Hiring team roles
 
 Convenience Methods:
     - client.get_job_funnel(job_id) - Get all stages for a job
@@ -30,22 +44,33 @@ For full documentation, see: https://github.com/deepweather/ashby_python_sdk
 
 from .client import AshbyClient
 from .models import (
+    Application,
+    ApplicationFormSubmission,
+    ArchiveReason,
+    Candidate,
+    CloseReason,
+    CustomField,
+    CustomFieldDefinition,
+    Department,
+    EmailAddress,
+    Feedback,
+    File,
+    HiringTeamMember,
+    HiringTeamRole,
+    Interview,
+    InterviewSchedule,
+    InterviewStage,
     Job,
     JobPosting,
-    Application,
-    Candidate,
-    File,
-    Note,
-    ApplicationFormSubmission,
-    InterviewStage,
-    Source,
-    User,
-    HiringTeamMember,
-    Tag,
     Link,
-    CustomField,
-    EmailAddress,
+    Location,
+    Note,
+    Offer,
     PhoneNumber,
+    Project,
+    Source,
+    Tag,
+    User,
 )
 from .exceptions import (
     AshbyError,
@@ -55,12 +80,12 @@ from .exceptions import (
     AshbyRateLimitError,
 )
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 __all__ = [
     # Main client
     "AshbyClient",
-    # Models
+    # Core models
     "Job",
     "JobPosting",
     "Application",
@@ -69,8 +94,21 @@ __all__ = [
     "Note",
     "ApplicationFormSubmission",
     "InterviewStage",
+    # New models (v0.4.0)
     "Source",
+    "ArchiveReason",
+    "CloseReason",
+    "Department",
+    "Location",
     "User",
+    "HiringTeamRole",
+    "CustomFieldDefinition",
+    "Project",
+    "Offer",
+    "Interview",
+    "InterviewSchedule",
+    "Feedback",
+    # Metadata models
     "HiringTeamMember",
     "Tag",
     "Link",

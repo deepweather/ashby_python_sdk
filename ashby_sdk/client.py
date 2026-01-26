@@ -14,7 +14,26 @@ import requests
 from dotenv import load_dotenv
 
 from .exceptions import AshbyAPIError, AshbyAuthError
-from .models import Application, Candidate, InterviewStage, Note
+from .models import (
+    Application,
+    ArchiveReason,
+    Candidate,
+    CloseReason,
+    CustomFieldDefinition,
+    Department,
+    Feedback,
+    HiringTeamRole,
+    Interview,
+    InterviewSchedule,
+    InterviewStage,
+    Location,
+    Note,
+    Offer,
+    Project,
+    Source,
+    Tag,
+    User,
+)
 from .resources import (
     JobsResource,
     ApplicationsResource,
@@ -24,10 +43,54 @@ from .resources import (
     FilesResource,
     JobPostingsResource,
     NotesResource,
+    GenericResource,
+    FeedbackResource,
 )
 
 # Load .env file if present
 load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Generic Resource Registry
+# ---------------------------------------------------------------------------
+# Configuration-driven endpoint registration.
+# Adding a new simple endpoint is just one line here.
+#
+# Format: "attribute_name": (endpoint_prefix, model_class, supports_get)
+#
+# Example: "sources": ("source", Source, False)
+#   -> Creates client.sources with .list() method
+#   -> Calls source.list endpoint
+#   -> Deserializes to Source model
+#   -> supports_get=False means .get() raises NotImplementedError
+#
+SIMPLE_RESOURCES: dict[str, tuple[type, str, bool]] = {
+    # Hiring Process Metadata (read-only list endpoints)
+    "sources": (Source, "source", False),
+    "archive_reasons": (ArchiveReason, "archiveReason", False),
+    "close_reasons": (CloseReason, "closeReason", False),
+    "candidate_tags": (Tag, "candidateTag", False),
+    "hiring_team_roles": (HiringTeamRole, "hiringTeamRole", False),
+    
+    # Organization (list + get endpoints)
+    "departments": (Department, "department", True),
+    "locations": (Location, "location", True),
+    "users": (User, "user", True),
+    
+    # Custom fields (list + get)
+    "custom_fields": (CustomFieldDefinition, "customField", True),
+    
+    # Projects / Talent pools (list + get)
+    "projects": (Project, "project", True),
+    
+    # Offers (list + get)
+    "offers": (Offer, "offer", True),
+    
+    # Interviews (list + get)  
+    "interviews": (Interview, "interview", True),
+    "interview_schedules": (InterviewSchedule, "interviewSchedule", True),
+}
 
 
 class AshbyClient:
@@ -70,7 +133,7 @@ class AshbyClient:
             "Accept": "application/json",
         }
 
-        # Initialize resource endpoints
+        # Initialize specialized resource endpoints
         self.jobs = JobsResource(self)
         self.applications = ApplicationsResource(self)
         self.candidates = CandidatesResource(self)
@@ -79,6 +142,12 @@ class AshbyClient:
         self.files = FilesResource(self)
         self.job_postings = JobPostingsResource(self)
         self.notes = NotesResource(self)
+        self.feedback = FeedbackResource(self)
+        
+        # Initialize generic resources from registry
+        # This allows adding new endpoints with just one line in SIMPLE_RESOURCES
+        for attr_name, (model_class, endpoint, supports_get) in SIMPLE_RESOURCES.items():
+            setattr(self, attr_name, GenericResource(self, endpoint, model_class, supports_get))
 
     def _request(self, endpoint: str, data: Optional[dict] = None) -> dict:
         """

@@ -45,6 +45,32 @@ def main():
         print(f"    Has resume: {bool(candidate.resume_handle)}")
         print()
 
+    # Demonstrate new features
+    print("\n--- New SDK Features ---\n")
+
+    # Sources
+    sources = client.sources.list()
+    print(f"Sources: {len(sources)} available")
+    for src in sources[:3]:
+        print(f"  - {src.name}")
+
+    # Departments
+    departments = client.departments.list()
+    print(f"\nDepartments: {len(departments)} available")
+    for dept in departments[:3]:
+        print(f"  - {dept.name}")
+
+    # Search for candidates
+    print("\nSearching for candidates named 'John'...")
+    results = client.candidates.search(name="John")
+    print(f"Found {len(results)} candidates")
+
+    # Archive reasons
+    reasons = client.archive_reasons.list()
+    print(f"\nArchive reasons: {len(reasons)} available")
+    for reason in reasons[:3]:
+        print(f"  - {reason.name}")
+
     return 0
 
 

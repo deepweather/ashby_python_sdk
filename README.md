@@ -71,9 +71,13 @@ Your API key needs these permissions:
 
 | Module | Permission | Endpoints |
 |--------|------------|-----------|
-| Jobs | Read | `job.list`, `job.info`, `jobPosting.list`, `jobPosting.info`, `interviewStage.list`, `interviewStage.info` |
-| Candidates | Read | `application.list`, `application.info`, `candidate.info`, `file.info`, `surveySubmission.list` |
-| Candidates | Write | `candidate.createNote` (for notes), `application.changeStage` (for moving candidates) |
+| Jobs | Read | `job.list`, `job.info`, `jobPosting.list`, `jobPosting.info`, `interviewStage.list`, `interviewStage.info`, `opening.list` |
+| Candidates | Read | `application.list`, `application.info`, `candidate.list`, `candidate.info`, `candidate.search`, `file.info`, `surveySubmission.list`, `applicationFeedback.list`, `project.list` |
+| Candidates | Write | `candidate.createNote` (for notes), `candidate.addTag` (for tagging), `application.changeStage` (for moving candidates) |
+| Interviews | Read | `interview.list`, `interview.info`, `interviewSchedule.list` |
+| Hiring Process | Read | `source.list`, `archiveReason.list`, `closeReason.list`, `candidateTag.list`, `customField.list`, `hiringTeamRole.list` |
+| Organization | Read | `department.list`, `department.info`, `location.list`, `location.info`, `user.list`, `user.info` |
+| Offers | Read | `offer.list`, `offer.info` |
 
 ## Resources
 
@@ -160,6 +164,16 @@ print(candidate.phone)
 print(candidate.links)       # LinkedIn, portfolio, etc.
 print(candidate.tags)
 print(candidate.resume_file) # File object with handle
+
+# Search candidates by email or name
+results = client.candidates.search(email="john@example.com")
+results = client.candidates.search(name="John")
+results = client.candidates.search(email="john@example.com", name="John")  # AND
+
+# Add a tag to a candidate
+tags = client.candidate_tags.list()
+if tags:
+    updated = client.candidates.add_tag(candidate_id="...", tag_id=tags[0].id)
 ```
 
 ### Questionnaires / Form Submissions
@@ -244,6 +258,83 @@ for note in notes:
     print(f"{note.created_at}: {note.content}")
 ```
 
+### Interview Feedback (Scorecards)
+
+```python
+# Get interview feedback/scorecards for an application
+feedback_list = client.feedback.list_for_application(application_id="...")
+for fb in feedback_list:
+    print(f"Submitted by: {fb.submitter.full_name}")
+    print(f"Recommendation: {fb.overall_recommendation}")
+    print(f"Technical score: {fb.get_score('Technical Skills')}")
+```
+
+### Organization Data
+
+```python
+# Departments
+departments = client.departments.list()
+dept = client.departments.get(department_id="...")
+
+# Locations
+locations = client.locations.list()
+loc = client.locations.get(location_id="...")
+
+# Users (team members)
+users = client.users.list()
+user = client.users.get(user_id="...")
+print(user.full_name, user.email, user.global_role)
+
+# Hiring team roles
+roles = client.hiring_team_roles.list()
+for role in roles:
+    print(role.name)  # e.g., "Hiring Manager", "Recruiter"
+```
+
+### Hiring Process Metadata
+
+```python
+# Sources (where candidates come from)
+sources = client.sources.list()
+for source in sources:
+    print(f"{source.name} ({source.type})")
+
+# Archive reasons (why candidates were rejected)
+archive_reasons = client.archive_reasons.list()
+for reason in archive_reasons:
+    print(f"{reason.name} - {reason.reason_type}")
+
+# Close reasons (why jobs were closed)
+close_reasons = client.close_reasons.list()
+
+# Candidate tags
+tags = client.candidate_tags.list()
+
+# Custom field definitions
+fields = client.custom_fields.list()
+field = client.custom_fields.get(custom_field_id="...")
+```
+
+### Other Resources
+
+```python
+# Projects (talent pools)
+projects = client.projects.list()
+project = client.projects.get(project_id="...")
+
+# Offers
+offers = client.offers.list()
+offer = client.offers.get(offer_id="...")
+
+# Interviews
+interviews = client.interviews.list()
+interview = client.interviews.get(interview_id="...")
+
+# Interview schedules
+schedules = client.interview_schedules.list()
+schedule = client.interview_schedules.get(interview_schedule_id="...")
+```
+
 ## Data Models
 
 All responses are wrapped in typed dataclasses:
@@ -258,6 +349,18 @@ All responses are wrapped in typed dataclasses:
 | `File` | File with download handle |
 | `InterviewStage` | Pipeline stage |
 | `Source` | Application source |
+| `ArchiveReason` | Reason for archiving/rejecting candidates |
+| `CloseReason` | Reason for closing jobs |
+| `Department` | Organization department |
+| `Location` | Office location |
+| `User` | Team member with role |
+| `HiringTeamRole` | Role type (Hiring Manager, Recruiter, etc.) |
+| `Project` | Talent pool |
+| `Offer` | Job offer |
+| `Interview` | Scheduled interview |
+| `InterviewSchedule` | Interview schedule |
+| `Feedback` | Interview scorecard/feedback |
+| `CustomFieldDefinition` | Custom field definition |
 | `HiringTeamMember` | Hiring team member |
 | `Tag`, `Link`, `CustomField` | Candidate metadata |
 
@@ -330,10 +433,34 @@ uv run mypy .
 | `client.interview_stages.get()` | `POST /interviewStage.info` |
 | `client.candidates.list()` | `POST /candidate.list` |
 | `client.candidates.get()` | `POST /candidate.info` |
+| `client.candidates.search()` | `POST /candidate.search` |
+| `client.candidates.add_tag()` | `POST /candidate.addTag` |
 | `client.notes.create()` | `POST /candidate.createNote` |
 | `client.notes.list()` | `POST /candidate.listNotes` |
 | `client.surveys.list()` | `POST /surveySubmission.list` |
 | `client.files.get_url()` | `POST /file.info` |
+| `client.feedback.list_for_application()` | `POST /applicationFeedback.list` |
+| `client.sources.list()` | `POST /source.list` |
+| `client.archive_reasons.list()` | `POST /archiveReason.list` |
+| `client.close_reasons.list()` | `POST /closeReason.list` |
+| `client.departments.list()` | `POST /department.list` |
+| `client.departments.get()` | `POST /department.info` |
+| `client.locations.list()` | `POST /location.list` |
+| `client.locations.get()` | `POST /location.info` |
+| `client.users.list()` | `POST /user.list` |
+| `client.users.get()` | `POST /user.info` |
+| `client.candidate_tags.list()` | `POST /candidateTag.list` |
+| `client.custom_fields.list()` | `POST /customField.list` |
+| `client.custom_fields.get()` | `POST /customField.info` |
+| `client.projects.list()` | `POST /project.list` |
+| `client.projects.get()` | `POST /project.info` |
+| `client.offers.list()` | `POST /offer.list` |
+| `client.offers.get()` | `POST /offer.info` |
+| `client.interviews.list()` | `POST /interview.list` |
+| `client.interviews.get()` | `POST /interview.info` |
+| `client.interview_schedules.list()` | `POST /interviewSchedule.list` |
+| `client.interview_schedules.get()` | `POST /interviewSchedule.info` |
+| `client.hiring_team_roles.list()` | `POST /hiringTeamRole.list` |
 
 See [Ashby API Documentation](https://developers.ashbyhq.com/reference) for full API details.
 
