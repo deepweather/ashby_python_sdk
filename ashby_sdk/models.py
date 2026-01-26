@@ -124,23 +124,36 @@ class File:
 
 @dataclass
 class InterviewStage:
-    """Represents an interview stage."""
+    """Represents an interview stage in the hiring funnel."""
 
     id: str
     name: str
     order_in_stage_group: Optional[int] = None
     stage_group_id: Optional[str] = None
+    stage_group_name: Optional[str] = None
+    type: Optional[str] = None  # e.g., "PreInterviewScreen", "Interview", "Offer", etc.
+    interview_plan_id: Optional[str] = None
+    raw_data: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: dict) -> Optional["InterviewStage"]:
         if not data:
             return None
+        # Handle nested interviewStageGroup if present
+        stage_group = data.get("interviewStageGroup", {})
         return cls(
             id=data.get("id", ""),
-            name=data.get("name", ""),
-            order_in_stage_group=data.get("orderInStageGroup"),
-            stage_group_id=data.get("stageGroupId"),
+            name=data.get("title", "") or data.get("name", ""),
+            order_in_stage_group=data.get("orderInStageGroup") or data.get("orderInInterviewPlan"),
+            stage_group_id=data.get("stageGroupId") or stage_group.get("id"),
+            stage_group_name=stage_group.get("name"),
+            type=data.get("type"),
+            interview_plan_id=data.get("interviewPlanId"),
+            raw_data=data,
         )
+
+    def __str__(self) -> str:
+        return f"{self.name} (ID: {self.id})"
 
 
 @dataclass

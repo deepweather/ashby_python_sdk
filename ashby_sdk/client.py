@@ -4,6 +4,8 @@ Ashby API Client
 Main client class for interacting with the Ashby ATS API.
 """
 
+from __future__ import annotations
+
 import os
 import base64
 from typing import Generator, Optional, TypeVar, Callable
@@ -15,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from .exceptions import AshbyAPIError, AshbyAuthError, AshbyNotFoundError
-from .models import Job, Application, Candidate, File, JobPosting, Note
+from .models import Job, Application, Candidate, File, JobPosting, Note, InterviewStage
 
 T = TypeVar("T")
 
@@ -133,6 +135,32 @@ class ApplicationsResource(BaseResource):
         """
         return self.get(application_id, expand_forms=True)
 
+    def change_stage(
+        self,
+        application_id: str,
+        interview_stage_id: str,
+    ) -> Application:
+        """
+        Move an application to a different interview stage.
+
+        This changes the candidate's position in the hiring funnel.
+
+        Args:
+            application_id: The application ID
+            interview_stage_id: The target interview stage ID
+
+        Returns:
+            Updated Application object
+        """
+        response = self._request(
+            "application.changeStage",
+            {
+                "applicationId": application_id,
+                "interviewStageId": interview_stage_id,
+            }
+        )
+        return Application.from_dict(response.get("results", {}))
+
 
 class CandidatesResource(BaseResource):
     """API resource for candidates."""
@@ -163,6 +191,76 @@ class CandidatesResource(BaseResource):
         """
         response = self._request("candidate.info", {"id": candidate_id})
         return Candidate.from_dict(response.get("results", {}))
+
+
+class InterviewStagesResource(BaseResource):
+    """API resource for interview stages (hiring funnel stages)."""
+
+    def list(
+        self,
+        interview_plan_id: str,
+        limit: int = 100,
+    ) -> list[InterviewStage]:
+        """
+        List all interview stages for an interview plan.
+
+        Args:
+            interview_plan_id: The interview plan ID (required)
+            limit: Results per page (default 100)
+
+        Returns:
+            List of InterviewStage objects
+        """
+        data = {"interviewPlanId": interview_plan_id}
+        stages = []
+        for s in self._paginate("interviewStage.list", data, limit):
+            stage = InterviewStage.from_dict(s)
+            if stage:
+                stages.append(stage)
+        return stages
+
+    def get(self, stage_id: str) -> InterviewStage:
+        """
+        Get an interview stage by ID.
+
+        Args:
+            stage_id: The interview stage ID
+
+        Returns:
+            InterviewStage object
+        """
+        response = self._request("interviewStage.info", {"interviewStageId": stage_id})
+        return InterviewStage.from_dict(response.get("results", {}))
+
+    def list_for_job(self, job_id: str) -> list[InterviewStage]:
+        """
+        Get all interview stages for a specific job.
+
+        This returns the stages in the job's interview plan/funnel.
+
+        Args:
+            job_id: The job ID
+
+        Returns:
+            List of InterviewStage objects ordered by stage order
+        """
+        # First get the job to find its interview plan
+        job_response = self._request("job.info", {"id": job_id})
+        job_data = job_response.get("results", {})
+        
+        plan_id = job_data.get("defaultInterviewPlanId")
+        if not plan_id:
+            # Try interviewPlanIds if no default
+            plan_ids = job_data.get("interviewPlanIds", [])
+            if plan_ids:
+                plan_id = plan_ids[0]
+        
+        if not plan_id:
+            return []
+        
+        stages = self.list(interview_plan_id=plan_id)
+        # Sort by order if available
+        return sorted(stages, key=lambda s: s.order_in_stage_group or 0)
 
 
 class SurveysResource(BaseResource):
@@ -495,6 +593,7 @@ class AshbyClient:
         self.jobs = JobsResource(self)
         self.applications = ApplicationsResource(self)
         self.candidates = CandidatesResource(self)
+        self.interview_stages = InterviewStagesResource(self)
         self.surveys = SurveysResource(self)
         self.files = FilesResource(self)
         self.job_postings = JobPostingsResource(self)
@@ -529,7 +628,11 @@ class AshbyClient:
         if not result.get("success", False):
             errors = result.get("errors", [])
             error_info = result.get("errorInfo", {})
-            message = error_info.get("message") if error_info else str(errors)
+            message = error_info.get("message") if error_info else None
+            if not message and errors:
+                message = str(errors)
+            if not message:
+                message = f"Unknown error (response: {result})"
             raise AshbyAPIError(f"API error: {message}", errors=errors)
 
         return result
@@ -635,3 +738,47 @@ class AshbyClient:
             Note object with the created note
         """
         return self.notes.create(candidate_id, note_text, note_type)
+
+    def get_application_stage(self, application_id: str) -> Optional[InterviewStage]:
+        """
+        Get the current interview stage for an application.
+
+        Args:
+            application_id: The application ID
+
+        Returns:
+            InterviewStage object or None if not in any stage
+        """
+        application = self.applications.get(application_id)
+        return application.current_stage
+
+    def move_application_to_stage(
+        self,
+        application_id: str,
+        interview_stage_id: str,
+    ) -> Application:
+        """
+        Move an application to a different interview stage.
+
+        This changes where the candidate is in the hiring funnel.
+        
+        Args:
+            application_id: The application ID
+            interview_stage_id: The target interview stage ID
+
+        Returns:
+            Updated Application object
+        """
+        return self.applications.change_stage(application_id, interview_stage_id)
+
+    def get_job_funnel(self, job_id: str) -> list[InterviewStage]:
+        """
+        Get all interview stages (funnel steps) for a job.
+
+        Args:
+            job_id: The job ID
+
+        Returns:
+            List of InterviewStage objects in order
+        """
+        return self.interview_stages.list_for_job(job_id)

@@ -71,9 +71,9 @@ Your API key needs these permissions:
 
 | Module | Permission | Endpoints |
 |--------|------------|-----------|
-| Jobs | Read | `job.list`, `job.info`, `jobPosting.list`, `jobPosting.info` |
+| Jobs | Read | `job.list`, `job.info`, `jobPosting.list`, `jobPosting.info`, `interviewStage.list`, `interviewStage.info` |
 | Candidates | Read | `application.list`, `application.info`, `candidate.info`, `file.info`, `surveySubmission.list` |
-| Candidates | Write | `candidate.createNote` (for notes) |
+| Candidates | Write | `candidate.createNote` (for notes), `application.changeStage` (for moving candidates) |
 
 ## Resources
 
@@ -108,6 +108,42 @@ app = client.applications.get_with_forms(application_id="...")
 for form in app.form_submissions:
     parsed = client.surveys.parse_submission(form)
     print(parsed["answers"])
+
+# Move candidate to a different stage in the funnel
+updated_app = client.applications.change_stage(
+    application_id="...",
+    interview_stage_id="..."
+)
+print(f"Moved to: {updated_app.stage_name}")
+```
+
+### Interview Stages (Hiring Funnel)
+
+```python
+# Get all interview stages for a job
+stages = client.interview_stages.list_for_job(job_id="...")
+for stage in stages:
+    print(f"{stage.name} (order: {stage.order_in_stage_group})")
+
+# Or use convenience method
+funnel = client.get_job_funnel(job_id="...")
+print("Hiring funnel stages:")
+for i, stage in enumerate(funnel, 1):
+    print(f"  {i}. {stage.name}")
+
+# Get current stage of an application
+current_stage = client.get_application_stage(application_id="...")
+print(f"Currently at: {current_stage.name}")
+
+# Move candidate to next stage
+client.move_application_to_stage(
+    application_id="...",
+    interview_stage_id=funnel[2].id  # Move to 3rd stage
+)
+
+# Get details about a specific stage
+stage = client.interview_stages.get(stage_id="...")
+print(f"Stage: {stage.name}, Type: {stage.type}")
 ```
 
 ### Candidates
@@ -289,6 +325,9 @@ uv run mypy .
 | `client.job_postings.get()` | `POST /jobPosting.info` |
 | `client.applications.list()` | `POST /application.list` |
 | `client.applications.get()` | `POST /application.info` |
+| `client.applications.change_stage()` | `POST /application.changeStage` |
+| `client.interview_stages.list()` | `POST /interviewStage.list` |
+| `client.interview_stages.get()` | `POST /interviewStage.info` |
 | `client.candidates.list()` | `POST /candidate.list` |
 | `client.candidates.get()` | `POST /candidate.info` |
 | `client.notes.create()` | `POST /candidate.createNote` |
