@@ -8,545 +8,26 @@ from __future__ import annotations
 
 import os
 import base64
-from typing import Generator, Optional, TypeVar, Callable
+from typing import Generator, Optional
 
 import requests
 from dotenv import load_dotenv
 
+from .exceptions import AshbyAPIError, AshbyAuthError
+from .models import Application, Candidate, InterviewStage, Note
+from .resources import (
+    JobsResource,
+    ApplicationsResource,
+    CandidatesResource,
+    InterviewStagesResource,
+    SurveysResource,
+    FilesResource,
+    JobPostingsResource,
+    NotesResource,
+)
+
 # Load .env file if present
 load_dotenv()
-
-from .exceptions import AshbyAPIError, AshbyAuthError, AshbyNotFoundError
-from .models import Job, Application, Candidate, File, JobPosting, Note, InterviewStage
-
-T = TypeVar("T")
-
-
-class BaseResource:
-    """Base class for API resources."""
-
-    def __init__(self, client: "AshbyClient"):
-        self._client = client
-
-    def _request(self, endpoint: str, data: Optional[dict] = None) -> dict:
-        return self._client._request(endpoint, data)
-
-    def _paginate(
-        self,
-        endpoint: str,
-        data: Optional[dict] = None,
-        limit: int = 100,
-    ) -> Generator[dict, None, None]:
-        return self._client._paginate(endpoint, data, limit)
-
-
-class JobsResource(BaseResource):
-    """API resource for jobs."""
-
-    def list(
-        self,
-        status: Optional[list[str]] = None,
-        limit: int = 100,
-    ) -> list[Job]:
-        """
-        List all jobs.
-
-        Args:
-            status: Filter by status (e.g., ["Open", "Closed", "Draft", "Archived"])
-            limit: Results per page (default 100)
-
-        Returns:
-            List of Job objects
-        """
-        data = {}
-        if status:
-            data["status"] = status
-        return [Job.from_dict(j) for j in self._paginate("job.list", data, limit)]
-
-    def get(self, job_id: str) -> Job:
-        """
-        Get a job by ID.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            Job object
-        """
-        response = self._request("job.info", {"id": job_id})
-        return Job.from_dict(response.get("results", {}))
-
-
-class ApplicationsResource(BaseResource):
-    """API resource for applications."""
-
-    def list(
-        self,
-        job_id: Optional[str] = None,
-        limit: int = 100,
-    ) -> list[Application]:
-        """
-        List applications.
-
-        Args:
-            job_id: Filter by job ID (optional)
-            limit: Results per page (default 100)
-
-        Returns:
-            List of Application objects
-        """
-        data = {}
-        if job_id:
-            data["jobId"] = job_id
-        return [
-            Application.from_dict(a) for a in self._paginate("application.list", data, limit)
-        ]
-
-    def get(
-        self,
-        application_id: str,
-        expand_forms: bool = False,
-    ) -> Application:
-        """
-        Get an application by ID.
-
-        Args:
-            application_id: The application ID
-            expand_forms: Whether to expand applicationFormSubmissions
-
-        Returns:
-            Application object with full details
-        """
-        data = {"applicationId": application_id}
-        if expand_forms:
-            data["expand"] = ["applicationFormSubmissions"]
-        response = self._request("application.info", data)
-        return Application.from_dict(response.get("results", {}))
-
-    def get_with_forms(self, application_id: str) -> Application:
-        """
-        Get an application with form submissions expanded.
-
-        Args:
-            application_id: The application ID
-
-        Returns:
-            Application object with applicationFormSubmissions populated
-        """
-        return self.get(application_id, expand_forms=True)
-
-    def change_stage(
-        self,
-        application_id: str,
-        interview_stage_id: str,
-    ) -> Application:
-        """
-        Move an application to a different interview stage.
-
-        This changes the candidate's position in the hiring funnel.
-
-        Args:
-            application_id: The application ID
-            interview_stage_id: The target interview stage ID
-
-        Returns:
-            Updated Application object
-        """
-        response = self._request(
-            "application.changeStage",
-            {
-                "applicationId": application_id,
-                "interviewStageId": interview_stage_id,
-            }
-        )
-        return Application.from_dict(response.get("results", {}))
-
-
-class CandidatesResource(BaseResource):
-    """API resource for candidates."""
-
-    def list(self, limit: int = 100) -> list[Candidate]:
-        """
-        List all candidates.
-
-        Args:
-            limit: Results per page (default 100)
-
-        Returns:
-            List of Candidate objects
-        """
-        return [
-            Candidate.from_dict(c) for c in self._paginate("candidate.list", limit=limit)
-        ]
-
-    def get(self, candidate_id: str) -> Candidate:
-        """
-        Get a candidate by ID.
-
-        Args:
-            candidate_id: The candidate ID
-
-        Returns:
-            Candidate object
-        """
-        response = self._request("candidate.info", {"id": candidate_id})
-        return Candidate.from_dict(response.get("results", {}))
-
-
-class InterviewStagesResource(BaseResource):
-    """API resource for interview stages (hiring funnel stages)."""
-
-    def list(
-        self,
-        interview_plan_id: str,
-        limit: int = 100,
-    ) -> list[InterviewStage]:
-        """
-        List all interview stages for an interview plan.
-
-        Args:
-            interview_plan_id: The interview plan ID (required)
-            limit: Results per page (default 100)
-
-        Returns:
-            List of InterviewStage objects
-        """
-        data = {"interviewPlanId": interview_plan_id}
-        stages = []
-        for s in self._paginate("interviewStage.list", data, limit):
-            stage = InterviewStage.from_dict(s)
-            if stage:
-                stages.append(stage)
-        return stages
-
-    def get(self, stage_id: str) -> InterviewStage:
-        """
-        Get an interview stage by ID.
-
-        Args:
-            stage_id: The interview stage ID
-
-        Returns:
-            InterviewStage object
-        """
-        response = self._request("interviewStage.info", {"interviewStageId": stage_id})
-        return InterviewStage.from_dict(response.get("results", {}))
-
-    def list_for_job(self, job_id: str) -> list[InterviewStage]:
-        """
-        Get all interview stages for a specific job.
-
-        This returns the stages in the job's interview plan/funnel.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            List of InterviewStage objects ordered by stage order
-        """
-        # First get the job to find its interview plan
-        job_response = self._request("job.info", {"id": job_id})
-        job_data = job_response.get("results", {})
-        
-        plan_id = job_data.get("defaultInterviewPlanId")
-        if not plan_id:
-            # Try interviewPlanIds if no default
-            plan_ids = job_data.get("interviewPlanIds", [])
-            if plan_ids:
-                plan_id = plan_ids[0]
-        
-        if not plan_id:
-            return []
-        
-        stages = self.list(interview_plan_id=plan_id)
-        # Sort by order if available
-        return sorted(stages, key=lambda s: s.order_in_stage_group or 0)
-
-
-class SurveysResource(BaseResource):
-    """API resource for survey/questionnaire submissions."""
-
-    def list(
-        self,
-        survey_type: str = "Questionnaire",
-        limit: int = 100,
-    ):
-        """
-        List all survey submissions of a given type.
-
-        Args:
-            survey_type: Type of survey (default "Questionnaire")
-            limit: Results per page (default 100)
-
-        Returns:
-            List of survey submission dicts
-        """
-        return list(self._paginate(
-            "surveySubmission.list",
-            {"surveyType": survey_type},
-            limit
-        ))
-
-    def get_for_candidate(
-        self,
-        candidate_id: str,
-        survey_type: str = "Questionnaire",
-    ):
-        """
-        Get all survey submissions for a specific candidate.
-
-        Args:
-            candidate_id: The candidate ID
-            survey_type: Type of survey (default "Questionnaire")
-
-        Returns:
-            List of survey submissions for this candidate
-        """
-        all_surveys = self.list(survey_type=survey_type)
-        return [s for s in all_surveys if s.get("candidateId") == candidate_id]
-
-    def parse_submission(self, submission: dict) -> dict:
-        """
-        Parse a survey or application form submission into a readable format.
-
-        Works for both surveySubmission and applicationFormSubmissions data.
-
-        Args:
-            submission: Raw submission dict (from survey or application form)
-
-        Returns:
-            Dict with field titles mapped to values
-        """
-        # Build field ID -> title mapping
-        field_map = {}
-        form_def = submission.get("formDefinition", {})
-        for section in form_def.get("sections", []):
-            for field_def in section.get("fields", []):
-                field = field_def.get("field", {})
-                field_id = field.get("id")
-                field_title = field.get("title")
-                field_path = field.get("path", "")
-                if field_id:
-                    field_map[field_id] = field_title
-                if field_path:
-                    field_map[field_path] = field_title
-
-        # Map submitted values to titles
-        result = {
-            "submitted_at": submission.get("submittedAt"),
-            "candidate_id": submission.get("candidateId"),
-            "application_id": submission.get("applicationId"),
-            "survey_type": submission.get("surveyType"),
-            "form_id": submission.get("id"),
-            "answers": {},
-        }
-
-        # System fields to skip (these are basic info, not questionnaire answers)
-        skip_fields = {
-            "_systemfield_resume",
-            "_systemfield_pre_parsed_resume",
-            "_systemfield_name",
-            "_systemfield_email",
-            "_systemfield_phone",
-        }
-
-        submitted = submission.get("submittedValues", {})
-        for field_key, value in submitted.items():
-            title = field_map.get(field_key, field_key)
-
-            # Skip system fields that contain basic candidate info
-            if field_key in skip_fields:
-                continue
-            if field_key.startswith("_systemfield_") and field_key not in field_map:
-                continue
-
-            # Format value
-            if isinstance(value, dict):
-                if "text" in value:
-                    value = value.get("text")
-                elif "name" in value:
-                    value = value.get("name")
-            elif isinstance(value, bool):
-                value = "Yes" if value else "No"
-            elif isinstance(value, list):
-                value = ", ".join(
-                    str(v.get("name", v) if isinstance(v, dict) else v) for v in value
-                )
-
-            result["answers"][title] = value
-
-        return result
-
-
-class FilesResource(BaseResource):
-    """API resource for files."""
-
-    def get_url(self, file_handle: str) -> str:
-        """
-        Get the download URL for a file.
-
-        Args:
-            file_handle: The file handle string
-
-        Returns:
-            Signed URL for downloading the file
-        """
-        response = self._request("file.info", {"fileHandle": file_handle})
-        return response.get("results", {}).get("url", "")
-
-    def download(self, file_handle: str) -> tuple[bytes, str]:
-        """
-        Download a file by its handle.
-
-        Args:
-            file_handle: The file handle string
-
-        Returns:
-            Tuple of (file content bytes, filename)
-        """
-        url = self.get_url(file_handle)
-        if not url:
-            raise AshbyNotFoundError(f"Could not get URL for file handle")
-
-        response = requests.get(url)
-        response.raise_for_status()
-
-        # Try to get filename from content-disposition header
-        content_disp = response.headers.get("content-disposition", "")
-        filename = "downloaded_file"
-        if "filename=" in content_disp:
-            filename = content_disp.split("filename=")[-1].strip('"')
-
-        return response.content, filename
-
-
-class JobPostingsResource(BaseResource):
-    """API resource for job postings (with descriptions)."""
-
-    def list(
-        self,
-        job_id: Optional[str] = None,
-        limit: int = 100,
-    ) -> list[JobPosting]:
-        """
-        List all job postings.
-
-        Args:
-            job_id: Filter by job ID (optional)
-            limit: Results per page (default 100)
-
-        Returns:
-            List of JobPosting objects
-        """
-        data = {}
-        if job_id:
-            data["jobId"] = job_id
-        return [
-            JobPosting.from_dict(p) for p in self._paginate("jobPosting.list", data, limit)
-        ]
-
-    def get(self, posting_id: str) -> JobPosting:
-        """
-        Get a job posting by ID.
-
-        Args:
-            posting_id: The job posting ID
-
-        Returns:
-            JobPosting object with description
-        """
-        response = self._request("jobPosting.info", {"jobPostingId": posting_id})
-        return JobPosting.from_dict(response.get("results", {}))
-
-    def get_for_job(self, job_id: str) -> Optional[JobPosting]:
-        """
-        Get the primary job posting for a job with full details.
-
-        This method first lists postings for the job, then fetches the 
-        full details (including description) for the first posting.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            JobPosting object with description, or None if no postings exist
-        """
-        postings = self.list(job_id=job_id)
-        if not postings:
-            return None
-        # Fetch full details including description
-        return self.get(postings[0].id)
-
-    def get_description(self, job_id: str) -> Optional[str]:
-        """
-        Get the job description for a job.
-        
-        Convenience method that fetches the job posting and returns
-        the plain text description.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            Plain text job description or None
-        """
-        posting = self.get_for_job(job_id)
-        return posting.description if posting else None
-
-
-class NotesResource(BaseResource):
-    """API resource for candidate notes."""
-
-    def create(
-        self,
-        candidate_id: str,
-        note_text: str,
-        note_type: str = "text/plain",
-    ) -> Note:
-        """
-        Create a note on a candidate.
-
-        Args:
-            candidate_id: The candidate ID
-            note_text: The note content
-            note_type: "text/plain" or "text/html" (default "text/plain")
-
-        Returns:
-            Note object with the created note
-        """
-        response = self._request(
-            "candidate.createNote",
-            {
-                "candidateId": candidate_id,
-                "note": note_text,
-                "type": note_type,
-            }
-        )
-        return Note.from_dict(response.get("results", {}))
-
-    def list(
-        self,
-        candidate_id: str,
-        limit: int = 100,
-    ) -> list[Note]:
-        """
-        List all notes for a candidate.
-
-        Args:
-            candidate_id: The candidate ID
-            limit: Results per page (default 100)
-
-        Returns:
-            List of Note objects
-        """
-        return [
-            Note.from_dict(n)
-            for n in self._paginate(
-                "candidate.listNotes",
-                {"candidateId": candidate_id},
-                limit
-            )
-        ]
 
 
 class AshbyClient:
@@ -672,50 +153,25 @@ class AshbyClient:
 
             cursor = response.get("nextCursor")
 
-    # Convenience methods for common operations
+    # -------------------------------------------------------------------------
+    # Convenience methods
+    # -------------------------------------------------------------------------
 
     def get_application_with_candidate(self, application_id: str) -> Application:
-        """
-        Get an application with full candidate details populated.
-
-        Args:
-            application_id: The application ID
-
-        Returns:
-            Application with candidate field populated
-        """
+        """Get an application with full candidate details populated."""
         application = self.applications.get(application_id)
         if application.candidate_id:
             application.candidate = self.candidates.get(application.candidate_id)
         return application
 
     def download_resume(self, candidate: Candidate) -> Optional[tuple[bytes, str]]:
-        """
-        Download a candidate's resume if available.
-
-        Args:
-            candidate: Candidate object
-
-        Returns:
-            Tuple of (file content, filename) or None if no resume
-        """
+        """Download a candidate's resume if available."""
         if not candidate.resume_handle:
             return None
         return self.files.download(candidate.resume_handle)
 
     def get_job_description(self, job_id: str) -> Optional[str]:
-        """
-        Get the job description for a job.
-        
-        Convenience method that fetches the job posting and returns
-        the plain text description.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            Plain text job description or None if not found
-        """
+        """Get the job description for a job."""
         return self.job_postings.get_description(job_id)
 
     def create_candidate_note(
@@ -724,31 +180,11 @@ class AshbyClient:
         note_text: str,
         note_type: str = "text/plain",
     ) -> Note:
-        """
-        Create a note on a candidate.
-
-        Convenience method for notes.create().
-
-        Args:
-            candidate_id: The candidate ID
-            note_text: The note content
-            note_type: "text/plain" or "text/html"
-
-        Returns:
-            Note object with the created note
-        """
+        """Create a note on a candidate."""
         return self.notes.create(candidate_id, note_text, note_type)
 
     def get_application_stage(self, application_id: str) -> Optional[InterviewStage]:
-        """
-        Get the current interview stage for an application.
-
-        Args:
-            application_id: The application ID
-
-        Returns:
-            InterviewStage object or None if not in any stage
-        """
+        """Get the current interview stage for an application."""
         application = self.applications.get(application_id)
         return application.current_stage
 
@@ -757,28 +193,9 @@ class AshbyClient:
         application_id: str,
         interview_stage_id: str,
     ) -> Application:
-        """
-        Move an application to a different interview stage.
-
-        This changes where the candidate is in the hiring funnel.
-        
-        Args:
-            application_id: The application ID
-            interview_stage_id: The target interview stage ID
-
-        Returns:
-            Updated Application object
-        """
+        """Move an application to a different interview stage."""
         return self.applications.change_stage(application_id, interview_stage_id)
 
     def get_job_funnel(self, job_id: str) -> list[InterviewStage]:
-        """
-        Get all interview stages (funnel steps) for a job.
-
-        Args:
-            job_id: The job ID
-
-        Returns:
-            List of InterviewStage objects in order
-        """
+        """Get all interview stages (funnel steps) for a job."""
         return self.interview_stages.list_for_job(job_id)
