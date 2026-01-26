@@ -91,3 +91,30 @@ class ApplicationsResource(BaseResource):
             }
         )
         return Application.from_dict(response.get("results", {}))
+
+    def archive(
+        self,
+        application_id: str,
+        archive_reason_id: str,
+    ) -> Application:
+        """
+        Archive an application with a reason.
+
+        This marks the candidate as rejected/archived in the hiring process.
+
+        Args:
+            application_id: The application ID
+            archive_reason_id: The ID of the archive reason
+
+        Returns:
+            Updated Application object
+        """
+        response = self._request(
+            "application.update",
+            {
+                "applicationId": application_id,
+                "isArchived": True,
+                "archiveReasonId": archive_reason_id,
+            }
+        )
+        return Application.from_dict(response.get("results", {}))
