@@ -595,11 +595,21 @@ class Feedback:
         # Try to extract overall recommendation from submitted values
         overall_rec = None
         submitted_values = data.get("submittedValues", [])
+        
+        # Normalize submitted_values - handle both dict and string formats
+        normalized_values = []
         for val in submitted_values:
-            field_info = val.get("field", {})
-            if field_info.get("title", "").lower() in ("overall recommendation", "recommendation"):
-                overall_rec = val.get("value")
-                break
+            if isinstance(val, dict):
+                normalized_values.append(val)
+                # Try to extract overall recommendation
+                field_info = val.get("field", {})
+                if isinstance(field_info, dict):
+                    title = field_info.get("title", "").lower()
+                    if title in ("overall recommendation", "recommendation"):
+                        overall_rec = val.get("value")
+            elif isinstance(val, str):
+                # Simple string value - convert to dict format
+                normalized_values.append({"value": val})
         
         return cls(
             id=data.get("id", ""),
@@ -608,7 +618,7 @@ class Feedback:
             submitted_at=data.get("submittedAt"),
             submitter=User.from_dict(data["submitter"]) if data.get("submitter") else None,
             form_definition=data.get("formDefinition"),
-            submitted_values=submitted_values,
+            submitted_values=normalized_values,
             overall_recommendation=overall_rec,
             raw_data=data,
         )
@@ -617,8 +627,10 @@ class Feedback:
         """Get a score/value by field title (case-insensitive)."""
         title_lower = field_title.lower()
         for val in self.submitted_values:
+            if not isinstance(val, dict):
+                continue
             field_info = val.get("field", {})
-            if field_info.get("title", "").lower() == title_lower:
+            if isinstance(field_info, dict) and field_info.get("title", "").lower() == title_lower:
                 return val.get("value")
         return None
 
