@@ -1,7 +1,7 @@
 # Ashby SDK
 
-[![PyPI version](https://badge.fury.io/py/ashby-sdk.svg)](https://badge.fury.io/py/ashby-sdk)
-[![Python versions](https://img.shields.io/pypi/pyversions/ashby-sdk.svg)](https://pypi.org/project/ashby-sdk/)
+[![PyPI version](https://badge.fury.io/py/ashby.svg)](https://badge.fury.io/py/ashby)
+[![Python versions](https://img.shields.io/pypi/pyversions/ashby.svg)](https://pypi.org/project/ashby/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 A Python SDK for the [Ashby](https://www.ashbyhq.com/) ATS (Applicant Tracking System) API.
@@ -9,13 +9,13 @@ A Python SDK for the [Ashby](https://www.ashbyhq.com/) ATS (Applicant Tracking S
 ## Installation
 
 ```bash
-pip install ashby-sdk
+pip install ashby
 ```
 
 Or with [uv](https://github.com/astral-sh/uv):
 
 ```bash
-uv add ashby-sdk
+uv add ashby
 ```
 
 ## Quick Start
@@ -470,7 +470,7 @@ MIT License - see [LICENSE](LICENSE) for details.
 
 ## Links
 
-- [PyPI Package](https://pypi.org/project/ashby-sdk/)
+- [PyPI Package](https://pypi.org/project/ashby/)
 - [GitHub Repository](https://github.com/deepweather/ashby_python_sdk)
 - [Ashby API Documentation](https://developers.ashbyhq.com/reference)
 - [Ashby Website](https://www.ashbyhq.com/)
