@@ -191,3 +191,151 @@ class TestSurveysParsing:
 
         parsed = client.surveys.parse_submission(survey)
         assert parsed["answers"]["Remote OK?"] == "Yes"
+
+
+class TestJobPostingsGetForJob:
+    """Tests for job posting selection when multiple postings exist."""
+
+    @pytest.fixture
+    def client(self):
+        return AshbyClient(api_key="test-key")
+
+    def _make_posting_dict(self, posting_id, title, job_id, updated_at):
+        return {
+            "id": posting_id,
+            "title": title,
+            "jobId": job_id,
+            "locationIds": {},
+            "isListed": True,
+            "isLive": True,
+            "employmentType": "FullTime",
+            "updatedAt": updated_at,
+        }
+
+    def _make_full_posting_dict(self, posting_id, title, job_id, description):
+        return {
+            "id": posting_id,
+            "title": title,
+            "jobId": job_id,
+            "locationIds": {},
+            "isListed": True,
+            "isLive": True,
+            "employmentType": "FullTime",
+            "descriptionPlain": description,
+        }
+
+    def test_single_posting_returns_it(self, client):
+        """With one posting, it should be returned directly."""
+        list_resp = {
+            "success": True,
+            "results": [
+                self._make_posting_dict("p1", "Engineer", "job-1", "2026-01-01T00:00:00Z"),
+            ],
+            "moreDataAvailable": False,
+        }
+        get_resp = {
+            "success": True,
+            "results": self._make_full_posting_dict("p1", "Engineer", "job-1", "desc"),
+        }
+        with patch.object(client, "_request", side_effect=[list_resp, get_resp]):
+            posting = client.job_postings.get_for_job("job-1")
+            assert posting is not None
+            assert posting.id == "p1"
+
+    def test_multiple_postings_matches_by_title(self, client):
+        """With multiple postings, the one matching job_title should win."""
+        list_resp = {
+            "success": True,
+            "results": [
+                self._make_posting_dict("p-wrong", "Customer Success Manager", "job-1", "2026-01-01T00:00:00Z"),
+                self._make_posting_dict("p-right", "Key Account Manager", "job-1", "2026-01-02T00:00:00Z"),
+            ],
+            "moreDataAvailable": False,
+        }
+        get_resp = {
+            "success": True,
+            "results": self._make_full_posting_dict("p-right", "Key Account Manager", "job-1", "KAM desc"),
+        }
+        with patch.object(client, "_request", side_effect=[list_resp, get_resp]):
+            posting = client.job_postings.get_for_job("job-1", job_title="Key Account Manager")
+            assert posting is not None
+            assert posting.id == "p-right"
+            assert posting.title == "Key Account Manager"
+
+    def test_multiple_postings_no_title_match_falls_back_to_newest(self, client):
+        """Without a title match, the most recently updated posting should be returned."""
+        list_resp = {
+            "success": True,
+            "results": [
+                self._make_posting_dict("p-old", "Old Title", "job-1", "2026-01-01T00:00:00Z"),
+                self._make_posting_dict("p-new", "New Title", "job-1", "2026-01-10T00:00:00Z"),
+            ],
+            "moreDataAvailable": False,
+        }
+        get_resp = {
+            "success": True,
+            "results": self._make_full_posting_dict("p-new", "New Title", "job-1", "newest desc"),
+        }
+        with patch.object(client, "_request", side_effect=[list_resp, get_resp]):
+            posting = client.job_postings.get_for_job("job-1", job_title="Nonexistent Title")
+            assert posting is not None
+            assert posting.id == "p-new"
+
+    def test_multiple_postings_no_title_given_falls_back_to_newest(self, client):
+        """Without job_title param, the most recently updated posting should be returned."""
+        list_resp = {
+            "success": True,
+            "results": [
+                self._make_posting_dict("p-old", "Title A", "job-1", "2026-01-01T00:00:00Z"),
+                self._make_posting_dict("p-new", "Title B", "job-1", "2026-01-10T00:00:00Z"),
+            ],
+            "moreDataAvailable": False,
+        }
+        get_resp = {
+            "success": True,
+            "results": self._make_full_posting_dict("p-new", "Title B", "job-1", "B desc"),
+        }
+        with patch.object(client, "_request", side_effect=[list_resp, get_resp]):
+            posting = client.job_postings.get_for_job("job-1")
+            assert posting is not None
+            assert posting.id == "p-new"
+
+    def test_get_description_resolves_title_automatically(self, client):
+        """get_description should look up the job title and match the right posting."""
+        # 1st call: job.info -> returns job with title "Key Account Manager"
+        job_info_resp = {
+            "success": True,
+            "results": {
+                "id": "job-1",
+                "title": "Key Account Manager",
+                "status": "Open",
+            },
+        }
+        # 2nd call: jobPosting.list -> returns two postings
+        list_resp = {
+            "success": True,
+            "results": [
+                self._make_posting_dict("p-wrong", "Customer Success Manager", "job-1", "2026-01-01T00:00:00Z"),
+                self._make_posting_dict("p-right", "Key Account Manager", "job-1", "2026-01-02T00:00:00Z"),
+            ],
+            "moreDataAvailable": False,
+        }
+        # 3rd call: jobPosting.info -> returns the matched posting with description
+        get_resp = {
+            "success": True,
+            "results": self._make_full_posting_dict("p-right", "Key Account Manager", "job-1", "The KAM JD"),
+        }
+        with patch.object(client, "_request", side_effect=[job_info_resp, list_resp, get_resp]):
+            description = client.job_postings.get_description("job-1")
+            assert description == "The KAM JD"
+
+    def test_no_postings_returns_none(self, client):
+        """With no postings, None should be returned."""
+        list_resp = {
+            "success": True,
+            "results": [],
+            "moreDataAvailable": False,
+        }
+        with patch.object(client, "_request", return_value=list_resp):
+            posting = client.job_postings.get_for_job("job-1")
+            assert posting is None
